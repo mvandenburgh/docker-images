@@ -11,13 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker-image:
-          - opensearch-index-build-logs
-          - pipeline-dashboard
         include:
           - docker-image: opensearch-index-build-logs
             image-version: 0.0.3
-          - docker-image: pipeline-dashboard
+          - docker-image: pipeline-dashboard-webservice
             image-version: 0.0.1
     steps:
       - name: Checkout
