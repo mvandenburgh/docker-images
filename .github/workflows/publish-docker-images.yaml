@@ -14,7 +14,7 @@ jobs:
         include:
           - docker-image: opensearch-index-build-logs
             image-version: 0.0.3
-          - docker-image: pipeline-dashboard-webservice
+          - docker-image: gitlab-error-processor
             image-version: 0.0.1
           - docker-image: upload-gitlab-failure-logs
             image-version: 0.0.1

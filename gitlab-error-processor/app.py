@@ -43,5 +43,5 @@ async def gitlab_webhook_consumer(request: Request):
     }
 
     # TODO:  make sure to add a namespace for running these jobs in
-    batch.create_namespaced_job('pipeline-dashboard', job_template)
+    batch.create_namespaced_job('gitlab-error-processor', job_template)
     return "ok"
