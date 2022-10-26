@@ -1,0 +1,12 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitlab-error-processing-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: gitlab-error-processing-job
+        image: ghcr.io/mvandenburgh/upload-gitlab-failure-logs:0.0.1
+        command: [ "printenv" ]
+      restartPolicy: Never
