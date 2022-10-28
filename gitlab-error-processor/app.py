@@ -25,7 +25,7 @@ async def gitlab_webhook_consumer(request: Request):
     if job_input_data.get("object_kind", "") != "build":
         raise HTTPException(status_code=400, detail="Invalid request")
 
-    if job_input_data["build_status"] != "failure":
+    if job_input_data["build_status"] != "failed":
         return Response("Not a failed job, no action needed.", status_code=200)
 
     # TODO: This endpoint will receive the gitlab webhook for failed jobs and
@@ -38,15 +38,23 @@ async def gitlab_webhook_consumer(request: Request):
             [dict(name="JOB_INPUT_DATA", value=json.dumps(job_input_data))]
         )
 
-    job_template["metadata"]["name"] = "gitlab-error-processing-job"
+    job_build_id = str(job_input_data["build_id"])
+    job_pipeline_id = str(job_input_data["pipeline_id"])
 
-    # Make sure to add labels to make finding the job that proccessed the
-    # error log easier.
+    job_template["metadata"][
+        "name"
+    ] = f"gitlab-error-processing-job-{job_build_id}-{job_pipeline_id}"
+
+    # Add labels to make finding the job that proccessed the error log easier.
     job_template["metadata"]["labels"] = {
-        "spack.io/gitlab-job-id": "22222",  # '{{job_id}}',
-        "spack.io/other-useful-annotation": "usefulAnnotation",
+        "spack.io/gitlab-build-id": job_build_id,
+        "spack.io/gitlab-pipeline-id": job_pipeline_id,
+        "spack.io/gitlab-ref": str(job_input_data["ref"]),
     }
 
     # TODO:  make sure to add a namespace for running these jobs in
-    batch.create_namespaced_job("gitlab-error-processor", job_template)
+    batch.create_namespaced_job(
+        "gitlab-error-processor",
+        job_template,
+    )
     return Response("Upload job dispatched.", status_code=202)
