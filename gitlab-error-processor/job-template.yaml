@@ -11,3 +11,5 @@ spec:
         image: ghcr.io/mvandenburgh/upload-gitlab-failure-logs:0.0.1
         imagePullPolicy: Always
       restartPolicy: Never
+      nodeSelector:
+        spack.io/node-pool: base
