@@ -196,7 +196,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
         if isinstance(e, requests.HTTPError):
             try:
                 logging.error(str(e.response.json()) + "\n\n")
-            except json.JSONDecodeError:
+            except:
                 logging.error(str(e.response.content) + "\n\n")
         return
 
