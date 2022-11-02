@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
           - docker-image: opensearch-index-build-logs
-            image-version: 0.0.3
+            image-version: 0.0.4
           - docker-image: gitlab-error-processor
             image-version: 0.0.1
           - docker-image: upload-gitlab-failure-logs
