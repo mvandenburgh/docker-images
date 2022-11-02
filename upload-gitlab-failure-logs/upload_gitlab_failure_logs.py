@@ -37,6 +37,14 @@ with open(Path(__file__).parent / "taxonomy.yaml") as f:
 job_input_data = json.loads(os.environ["JOB_INPUT_DATA"])
 job_input_data["error_taxonomy_version"] = taxonomy["version"]
 
+# Convert all string timestamps in webhook payload to `datetime` objects
+for key, val in job_input_data.items():
+    try:
+        if isinstance(val, str):
+            job_input_data[key] = datetime.strptime(val, "%Y-%m-%d %H:%M:%S %Z")
+    except ValueError:
+        continue
+
 gl = gitlab.Gitlab(GITLAB_URL, GITLAB_TOKEN)
 
 connections.create_connection(
