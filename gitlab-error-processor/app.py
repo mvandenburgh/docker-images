@@ -25,6 +25,10 @@ for env_var in (
 
 @app.post("/")
 async def gitlab_webhook_consumer(request: Request):
+    """
+    This endpoint receives the gitlab webhook for failed jobs and creates
+    a k8s job to parse the logs and upload them to opensearch.
+    """
     job_input_data = await request.json()
 
     if job_input_data.get("object_kind", "") != "build":
@@ -33,8 +37,6 @@ async def gitlab_webhook_consumer(request: Request):
     if job_input_data["build_status"] != "failed":
         return Response("Not a failed job, no action needed.", status_code=200)
 
-    # TODO: This endpoint will receive the gitlab webhook for failed jobs and
-    # create a k8s job to parse the logs and upload them to opensearch.
     with open(Path(__file__).parent / "job-template.yaml") as f:
         job_template = yaml.safe_load(f)
 
@@ -81,9 +83,9 @@ async def gitlab_webhook_consumer(request: Request):
         "spack.io/gitlab-pipeline-id": job_pipeline_id,
     }
 
-    # TODO:  make sure to add a namespace for running these jobs in
     batch.create_namespaced_job(
-        "gitlab-error-processor",
+        "custom",
         job_template,
     )
+
     return Response("Upload job dispatched.", status_code=202)
