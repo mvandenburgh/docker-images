@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -11,7 +12,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any
 
 import boto3
-import pyjson5 as json
+import pyjson5
 import requests
 from botocore import UNSIGNED
 from botocore.client import Config
@@ -63,7 +64,6 @@ def upload_to_opensearch(
     build_hash: str,
     spec_json: dict,
     install_times_json: dict,
-    spack_build_out: dict[str, str],
 ):
     """
     Given a spec.json, install_times.json, and spack-build-out files, package them all
@@ -89,7 +89,6 @@ def upload_to_opensearch(
     document["hash"] = build_hash
     document["spec"] = spec_json["spec"]
     document["install_times"] = install_times_json
-    document["spack-build-out"] = spack_build_out
 
     post_logs(document)
 
@@ -103,7 +102,7 @@ def create_opensearch_index():
     """
     index_name = f"pipeline-logs-{TODAY.strftime('%Y.%m.%d')}"
     with open(Path(__file__).parent / "pipeline_logs_mapping.json5") as fd:
-        index_mappings = json.load(fd)
+        index_mappings = pyjson5.load(fd)
     res = requests.put(
         f"{OPENSEARCH_ENDPOINT}/{index_name}",
         data=json.dumps(index_mappings),
@@ -112,11 +111,12 @@ def create_opensearch_index():
     )
     if res.status_code >= 400:
         logging.error(
-            f'Failed to create opensearch index "{index_name}", server responded with status {res.status_code}'
+            f'Failed to create opensearch index "{index_name}", '
+            f'server responded with status {res.status_code}'
         )
         try:
             logging.error(res.json())
-        except:
+        except json.JSONDecodeError:
             logging.error(res.text)
 
 
@@ -162,32 +162,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
                     ).read_text()
                 )
 
-                spack_build_out: dict[str, str] = {}
-
-                # Find all files with name in format of
-                # `spack-build-<phase-name>-<phase-number>-out.txt`
-                spack_build_out_paths = re.findall(
-                    rf"{package}-{build_hash}/.spack/spack-build-(\d+)-(.+)-out.txt",
-                    "\n".join(tar.getnames()),
-                )
-
-                # Extract all spack-build-<phase-name>-<phase-number>-out.txt files from the tarball
-                # and add them as seperate entries in the spack_build_out JSON object.
-                for phase_number, phase_name in spack_build_out_paths:
-                    tar.extract(
-                        f"{package}-{build_hash}/.spack/spack-build-{phase_number}-{phase_name}-out.txt",
-                        path=temp_dir,
-                    )
-                    spack_build_out[f"{phase_number}-{phase_name}"] = (
-                        Path(temp_dir)
-                        / f"{package}-{build_hash}"
-                        / ".spack"
-                        / f"spack-build-{phase_number}-{phase_name}-out.txt"
-                    ).read_text()
-
-                upload_to_opensearch(
-                    build_hash, spec_json, install_times, spack_build_out
-                )
+                upload_to_opensearch(build_hash, spec_json, install_times)
     except Exception as e:
         # Catch all exceptions and log error instead of crashing script
         logging.error(f'Error occurred while processing Key "{spec_json_sig_key}"')
@@ -196,7 +171,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
         if isinstance(e, requests.HTTPError):
             try:
                 logging.error(str(e.response.json()) + "\n\n")
-            except:
+            except json.JSONDecodeError:
                 logging.error(str(e.response.content) + "\n\n")
         return
 
