@@ -12,10 +12,12 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any
 
 import boto3
+import gitlab
 import pyjson5
 import requests
 from botocore import UNSIGNED
 from botocore.client import Config
+from kubernetes import client, config
 
 # Authenticate the boto3 client with AWS.
 # Since the spack build cache is a public S3 bucket, we don't need credentials
@@ -34,7 +36,109 @@ OPENSEARCH_ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
 OPENSEARCH_USERNAME = os.environ["OPENSEARCH_USERNAME"]
 OPENSEARCH_PASSWORD = os.environ["OPENSEARCH_PASSWORD"]
 
+METABASE_USERNAME = os.environ["METABASE_USERNAME"]
+METABASE_PASSWORD = os.environ["METABASE_PASSWORD"]
+
 TODAY = datetime.today()
+
+gl = gitlab.Gitlab("https://gitlab.spack.io", os.environ["GITLAB_TOKEN"])
+
+# Get client ca from a k8s secret
+config.load_incluster_config()
+v1 = client.CoreV1Api()
+client_ca = v1.read_namespaced_secret("client-ca", "ingress-nginx").to_dict()
+
+print(client_ca)
+
+metabase_session = requests.Session()
+
+# Get a session token from the metabase API
+with (
+    NamedTemporaryFile("r+") as crt,
+    NamedTemporaryFile("r+") as key,
+):
+    crt.write(client_ca["data"]["ca.crt"])
+    key.write(client_ca["data"]["ca.key"])
+    print(client_ca["data"]["ca.crt"])
+    print(client_ca["data"]["ca.key"])
+    print('test')
+    print(Path(crt.name).read_text())
+    print(Path(key.name).read_text())
+
+    res = metabase_session.post(
+        "https://metabase.spack.io/api/session",
+        data=json.dumps(
+            {
+                "username": METABASE_USERNAME,
+                "password": METABASE_PASSWORD,
+            }
+        ),
+        headers={"Content-Type": "application/json"},
+        cert=(
+            crt.name,
+            key.name,
+        ),
+    )
+
+session_id: str = res.json()["id"]
+
+
+def get_gitlab_build_job_metadata(build_hash: str) -> dict:
+    """
+    Get metadata from the gitlab job that performed this build.
+
+    Searches metabase for the gitlab job with the given build hash,
+    then uses the resulting job ID to get the job's metadata from
+    the gitlab API.
+    """
+    shortened_build_hash = build_hash[:7]
+
+    with (
+        NamedTemporaryFile("r+") as crt,
+        NamedTemporaryFile("r+") as key,
+    ):
+        crt.write(client_ca["data"]["ca.crt"])
+        key.write(client_ca["data"]["ca.key"])
+
+        res = requests.post(
+            "https://metabase.spack.io/api/dataset",
+            data=json.dumps(
+                {
+                    "type": "query",
+                    "query": {
+                        "source-table": 893,
+                        "filter": [
+                            "contains",
+                            ["field", 10263, None],
+                            f"/{shortened_build_hash}",
+                            {"case-sensitive": False},
+                        ],
+                    },
+                    "database": 3,
+                    "parameters": [],
+                }
+            ),
+            headers={
+                "Content-Type": "application/json",
+                "X-Metabase-Session": session_id,
+            },
+            cert=(
+                crt.name,
+                key.name,
+            ),
+        )
+
+    rows: list[list[str]] = res.json()["data"]["rows"]
+
+    # Get most recent successful build
+    row = [r for r in rows if r[0] == "success"][0]
+
+    gitlab_job_id = int(row[-2])
+
+    project = gl.projects.get(2)
+    job = project.jobs.get(gitlab_job_id)
+
+    return json.loads(job.to_json())
 
 
 def post_logs(log_data):
@@ -69,26 +173,12 @@ def upload_to_opensearch(
     Given a spec.json, install_times.json, and spack-build-out files, package them all
     into a single JSON document and POSTs them to the OpenSearch API.
     """
-    # Check if a document with this hash already exists, and if so don't upload it.
-    res = requests.get(
-        f"{OPENSEARCH_ENDPOINT}/pipeline-logs*/_search",
-        data=json.dumps({"query": {"match": {"hash": build_hash}}}),
-        headers={"Content-Type": "application/json"},
-        auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
-    )
-    res.raise_for_status()
-
-    if res.json()["hits"]["total"]["value"] > 0:
-        logging.info(
-            f"Skipping upload of record with build hash {build_hash} - already exists."
-        )
-        return
-
     document: dict[str, Any] = {}
 
     document["hash"] = build_hash
     document["spec"] = spec_json["spec"]
     document["install_times"] = install_times_json
+    document["gitlab_job_metadata"] = get_gitlab_build_job_metadata(build_hash)
 
     post_logs(document)
 
@@ -112,7 +202,7 @@ def create_opensearch_index():
     if res.status_code >= 400:
         logging.error(
             f'Failed to create opensearch index "{index_name}", '
-            f'server responded with status {res.status_code}'
+            f"server responded with status {res.status_code}"
         )
         try:
             logging.error(res.json())
@@ -128,6 +218,21 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
         rf"{PREFIX}/(.+)-(.+-[\d+\.]+)-(.+)-(.+).spec.json.sig",
         spec_json_sig_key,
     )[0]
+
+    # Check if a document with this hash already exists, and if so don't upload it.
+    res = requests.get(
+        f"{OPENSEARCH_ENDPOINT}/pipeline-logs*/_search",
+        data=json.dumps({"query": {"match": {"hash": build_hash}}}),
+        headers={"Content-Type": "application/json"},
+        auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
+    )
+    res.raise_for_status()
+
+    if res.json()["hits"]["total"]["value"] > 0:
+        logging.info(
+            f"Skipping upload of record with build hash {build_hash} - already exists."
+        )
+        return
 
     binary_prefix = f"{PREFIX}/{os_arch}/{compiler}/{package}"
     file_path = f"{binary_prefix}/{os_arch}-{compiler}-{package}-{build_hash}.spack"
