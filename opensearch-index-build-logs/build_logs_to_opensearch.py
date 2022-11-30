@@ -13,11 +13,12 @@ from typing import Any
 
 import boto3
 import gitlab
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import pyjson5
 import requests
 from botocore import UNSIGNED
 from botocore.client import Config
-from kubernetes import client, config
 
 # Authenticate the boto3 client with AWS.
 # Since the spack build cache is a public S3 bucket, we don't need credentials
@@ -26,6 +27,15 @@ s3 = boto3.client(
     config=Config(retries={"mode": "adaptive"}, signature_version=UNSIGNED),
     region_name="us-east-1",
 )
+
+db_conn = psycopg2.connect(
+    host=os.environ["GITLAB_PG_HOST"],
+    port=os.environ["GITLAB_PG_PORT"],
+    dbname=os.environ["GITLAB_PG_DBNAME"],
+    user=os.environ["GITLAB_PG_USER"],
+    password=os.environ["GITLAB_PG_PASS"],
+)
+cur = db_conn.cursor(cursor_factory=RealDictCursor)
 
 logging.basicConfig(level=logging.ERROR)  # Only log ERROR messages
 
@@ -36,51 +46,9 @@ OPENSEARCH_ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
 OPENSEARCH_USERNAME = os.environ["OPENSEARCH_USERNAME"]
 OPENSEARCH_PASSWORD = os.environ["OPENSEARCH_PASSWORD"]
 
-METABASE_USERNAME = os.environ["METABASE_USERNAME"]
-METABASE_PASSWORD = os.environ["METABASE_PASSWORD"]
-
 TODAY = datetime.today()
 
 gl = gitlab.Gitlab("https://gitlab.spack.io", os.environ["GITLAB_TOKEN"])
-
-# Get client ca from a k8s secret
-config.load_incluster_config()
-v1 = client.CoreV1Api()
-client_ca = v1.read_namespaced_secret("client-ca", "ingress-nginx").to_dict()
-
-print(client_ca)
-
-metabase_session = requests.Session()
-
-# Get a session token from the metabase API
-with (
-    NamedTemporaryFile("r+") as crt,
-    NamedTemporaryFile("r+") as key,
-):
-    crt.write(client_ca["data"]["ca.crt"])
-    key.write(client_ca["data"]["ca.key"])
-    print(client_ca["data"]["ca.crt"])
-    print(client_ca["data"]["ca.key"])
-    print('test')
-    print(Path(crt.name).read_text())
-    print(Path(key.name).read_text())
-
-    res = metabase_session.post(
-        "https://metabase.spack.io/api/session",
-        data=json.dumps(
-            {
-                "username": METABASE_USERNAME,
-                "password": METABASE_PASSWORD,
-            }
-        ),
-        headers={"Content-Type": "application/json"},
-        cert=(
-            crt.name,
-            key.name,
-        ),
-    )
-
-session_id: str = res.json()["id"]
 
 
 def get_gitlab_build_job_metadata(build_hash: str) -> dict:
@@ -93,51 +61,14 @@ def get_gitlab_build_job_metadata(build_hash: str) -> dict:
     """
     shortened_build_hash = build_hash[:7]
 
-    with (
-        NamedTemporaryFile("r+") as crt,
-        NamedTemporaryFile("r+") as key,
-    ):
-        crt.write(client_ca["data"]["ca.crt"])
-        key.write(client_ca["data"]["ca.key"])
-
-        res = requests.post(
-            "https://metabase.spack.io/api/dataset",
-            data=json.dumps(
-                {
-                    "type": "query",
-                    "query": {
-                        "source-table": 893,
-                        "filter": [
-                            "contains",
-                            ["field", 10263, None],
-                            f"/{shortened_build_hash}",
-                            {"case-sensitive": False},
-                        ],
-                    },
-                    "database": 3,
-                    "parameters": [],
-                }
-            ),
-            headers={
-                "Content-Type": "application/json",
-                "X-Metabase-Session": session_id,
-            },
-            cert=(
-                crt.name,
-                key.name,
-            ),
-        )
-
-    rows: list[list[str]] = res.json()["data"]["rows"]
-
-    # Get most recent successful build
-    row = [r for r in rows if r[0] == "success"][0]
-
-    gitlab_job_id = int(row[-2])
-
+    cur.execute(
+        "SELECT id FROM ci_builds WHERE name LIKE '%%' || %(hash)s || '%%'",
+        {"hash": shortened_build_hash},
+    )
+    results = [dict(r) for r in cur.fetchall()]
+    gitlab_job_id = int(results[0]["id"])
     project = gl.projects.get(2)
     job = project.jobs.get(gitlab_job_id)
-
     return json.loads(job.to_json())
 
 
@@ -302,4 +233,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        cur.close()
+        db_conn.close()
