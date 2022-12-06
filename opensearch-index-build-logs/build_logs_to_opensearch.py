@@ -6,7 +6,6 @@ import os
 import re
 import tarfile
 from datetime import datetime
-from multiprocessing import Pool
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Any
@@ -226,10 +225,9 @@ def main():
         ]
         all_pages.extend(contents)
 
-    with Pool(processes=os.cpu_count()) as pool:
-        pool.map(fetch_and_upload_tarball, all_pages)
-        pool.close()
-        pool.join()
+    # TODO: parallelize this
+    for spec_key_json in all_pages:
+        fetch_and_upload_tarball(spec_key_json)
 
 
 if __name__ == "__main__":
