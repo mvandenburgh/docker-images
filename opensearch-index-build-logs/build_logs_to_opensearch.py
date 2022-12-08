@@ -145,7 +145,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
 
     # Extract metadata from *.spec.json.sig filename
     (os_arch, compiler, package, build_hash) = re.findall(
-        rf"{PREFIX}/(.+)-(.+-[\d+\.]+)-(.+)-(.+).spec.json.sig",
+        rf"{PREFIX}/(.+)-(.+-\d+\.\d+[\.\d+]?)-(.+)-([a-zA-Z0-9]){32}.spec.json.sig",
         spec_json_sig_key,
     )[0]
 
