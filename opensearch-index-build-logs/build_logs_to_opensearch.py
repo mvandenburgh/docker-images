@@ -141,13 +141,42 @@ def create_opensearch_index():
 
 
 def fetch_and_upload_tarball(spec_json_sig_key: str):
-    logging.info(f'Fetching and uploading "{spec_json_sig_key}"...')
+    print(f'Fetching and uploading "{spec_json_sig_key}"...')
 
-    # Extract metadata from *.spec.json.sig filename
-    (os_arch, compiler, package, build_hash) = re.findall(
-        rf"{PREFIX}\/(.+)-([gcc]*-\d+[\.\d+]*)-(.+)-([a-zA-Z0-9]{32}).spec.json.sig",
+    build_hash = spec_json_sig_key.rstrip("")[-32 - len(".spec.json.sig") :][
+        : -len(".spec.json.sig")
+    ]
+    shortened_build_hash = build_hash[:7]
+
+    cur.execute(
+        "SELECT name FROM ci_builds WHERE name LIKE '%%' || %(hash)s || '%%'",
+        {"hash": shortened_build_hash},
+    )
+    print(
+        f"SELECT name FROM ci_builds WHERE name LIKE '%%' || '{shortened_build_hash}' || '%%'"
+    )
+    results = [dict(r) for r in cur.fetchall()]
+    print(results)
+    gitlab_job_name: str = results[0]["name"]
+
+    compiler = gitlab_job_name.split()[3].replace("@", "-")
+    os_name = gitlab_job_name.split()[4]
+
+    print(
+        rf"{PREFIX}\/{os_name}-{compiler}-(.+)-([a-zA-Z0-9]{{32}}).spec.json.sig",
+    )
+
+    # Extract package name from *.spec.json.sig filename
+    package = re.findall(
+        rf"{PREFIX}\/{os_name}-{compiler}-(.+)-[a-zA-Z0-9]{{32}}.spec.json.sig",
         spec_json_sig_key,
     )[0]
+
+    print(compiler, package, build_hash)
+
+    return
+
+    # (specs) llvm/r2fl7wb 8.0.0 gcc@7.5.0 linux-ubuntu18.04-x86_64 New PR testing workflow
 
     # Check if a document with this hash already exists, and if so don't upload it.
     res = requests.get(
