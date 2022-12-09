@@ -164,6 +164,11 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
     )
     print(f"SELECT name FROM ci_builds WHERE name LIKE '%%' || '{shortened_build_hash}' || '%%' AND status = 'success' ORDER BY id DESC")
     results = [dict(r) for r in cur.fetchall()]
+
+    if not len(results):
+        logging.error(f'No gitlab job entry found for {spec_json_sig_key}')
+        return
+
     gitlab_job_name: str = results[0]["name"]
 
     compiler = gitlab_job_name.split()[3].replace("@", "-")
