@@ -36,7 +36,7 @@ db_conn = psycopg2.connect(
 )
 cur = db_conn.cursor(cursor_factory=RealDictCursor)
 
-logging.basicConfig(level=logging.ERROR)  # Only log ERROR messages
+logging.basicConfig(level=logging.INFO)  # Only log ERROR messages
 
 BUCKET = "spack-binaries"
 PREFIX = "develop/build_cache"
