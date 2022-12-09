@@ -36,7 +36,7 @@ db_conn = psycopg2.connect(
 )
 cur = db_conn.cursor(cursor_factory=RealDictCursor)
 
-logging.basicConfig(level=logging.INFO)  # Only log ERROR messages
+logging.basicConfig(level=logging.ERROR)  # Only log ERROR messages
 
 BUCKET = "spack-binaries"
 PREFIX = "develop/build_cache"
@@ -162,6 +162,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
         """,
         {"hash": shortened_build_hash},
     )
+    print(f"SELECT name FROM ci_builds WHERE name LIKE '%%' || '{shortened_build_hash}' || '%%' AND status = 'success' ORDER BY id DESC")
     results = [dict(r) for r in cur.fetchall()]
     gitlab_job_name: str = results[0]["name"]
 
