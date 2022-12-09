@@ -61,7 +61,13 @@ def get_gitlab_build_job_metadata(build_hash: str) -> dict:
     shortened_build_hash = build_hash[:7]
 
     cur.execute(
-        "SELECT id FROM ci_builds WHERE name LIKE '%%' || %(hash)s || '%%'",
+        """
+        SELECT id
+        FROM ci_builds
+        WHERE name LIKE '%%' || %(hash)s || '%%'
+        AND status = 'success'
+        ORDER BY id DESC
+        """,
         {"hash": shortened_build_hash},
     )
     results = [dict(r) for r in cur.fetchall()]
@@ -143,40 +149,30 @@ def create_opensearch_index():
 def fetch_and_upload_tarball(spec_json_sig_key: str):
     print(f'Fetching and uploading "{spec_json_sig_key}"...')
 
-    build_hash = spec_json_sig_key.rstrip("")[-32 - len(".spec.json.sig") :][
-        : -len(".spec.json.sig")
-    ]
+    build_hash = spec_json_sig_key[: -len(".spec.json.sig")][-32:]
     shortened_build_hash = build_hash[:7]
 
     cur.execute(
-        "SELECT name FROM ci_builds WHERE name LIKE '%%' || %(hash)s || '%%'",
+        """
+        SELECT name
+        FROM ci_builds
+        WHERE name LIKE '%%' || %(hash)s || '%%'
+        AND status = 'success'
+        ORDER BY id DESC
+        """,
         {"hash": shortened_build_hash},
     )
-    print(
-        f"SELECT name FROM ci_builds WHERE name LIKE '%%' || '{shortened_build_hash}' || '%%'"
-    )
     results = [dict(r) for r in cur.fetchall()]
-    print(results)
     gitlab_job_name: str = results[0]["name"]
 
     compiler = gitlab_job_name.split()[3].replace("@", "-")
-    os_name = gitlab_job_name.split()[4]
-
-    print(
-        rf"{PREFIX}\/{os_name}-{compiler}-(.+)-([a-zA-Z0-9]{{32}}).spec.json.sig",
-    )
+    os_arch = gitlab_job_name.split()[4]
 
     # Extract package name from *.spec.json.sig filename
     package = re.findall(
-        rf"{PREFIX}\/{os_name}-{compiler}-(.+)-[a-zA-Z0-9]{{32}}.spec.json.sig",
+        rf"{PREFIX}\/{os_arch}-{compiler}-(.+)-[a-zA-Z0-9]{{32}}.spec.json.sig",
         spec_json_sig_key,
     )[0]
-
-    print(compiler, package, build_hash)
-
-    return
-
-    # (specs) llvm/r2fl7wb 8.0.0 gcc@7.5.0 linux-ubuntu18.04-x86_64 New PR testing workflow
 
     # Check if a document with this hash already exists, and if so don't upload it.
     res = requests.get(
