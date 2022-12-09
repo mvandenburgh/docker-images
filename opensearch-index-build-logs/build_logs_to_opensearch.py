@@ -50,7 +50,7 @@ TODAY = datetime.today()
 gl = gitlab.Gitlab("https://gitlab.spack.io", os.environ["GITLAB_TOKEN"])
 
 
-def get_gitlab_build_job_metadata(build_hash: str) -> dict:
+def get_gitlab_build_job_metadata(build_hash: str) -> dict[str, Any]:
     """
     Get metadata from the gitlab job that performed this build.
 
@@ -147,7 +147,7 @@ def create_opensearch_index():
 
 
 def fetch_and_upload_tarball(spec_json_sig_key: str):
-    print(f'Fetching and uploading "{spec_json_sig_key}"...')
+    logging.info(f'Fetching and uploading "{spec_json_sig_key}"...')
 
     build_hash = spec_json_sig_key[: -len(".spec.json.sig")][-32:]
     shortened_build_hash = build_hash[:7]
@@ -162,7 +162,6 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
         """,
         {"hash": shortened_build_hash},
     )
-    print(f"SELECT name FROM ci_builds WHERE name LIKE '%%' || '{shortened_build_hash}' || '%%' AND status = 'success' ORDER BY id DESC")
     results = [dict(r) for r in cur.fetchall()]
 
     if not len(results):
