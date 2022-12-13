@@ -165,7 +165,7 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
     results = [dict(r) for r in cur.fetchall()]
 
     if not len(results):
-        logging.error(f'No gitlab job entry found for {spec_json_sig_key}')
+        logging.error(f"No gitlab job entry found for {spec_json_sig_key}")
         return
 
     gitlab_job_name: str = results[0]["name"]
@@ -173,11 +173,15 @@ def fetch_and_upload_tarball(spec_json_sig_key: str):
     compiler = gitlab_job_name.split()[3].replace("@", "-")
     os_arch = gitlab_job_name.split()[4]
 
-    # Extract package name from *.spec.json.sig filename
-    package = re.findall(
-        rf"{PREFIX}\/{os_arch}-{compiler}-(.+)-[a-zA-Z0-9]{{32}}.spec.json.sig",
-        spec_json_sig_key,
-    )[0]
+    package_regex = (
+        rf"{PREFIX}\/{os_arch}-{compiler}-(.+)-[a-zA-Z0-9]{{32}}.spec.json.sig"
+    )
+    try:
+        # Extract package name from *.spec.json.sig filename
+        package = re.findall(package_regex, spec_json_sig_key)[0]
+    except IndexError:
+        logging.error(f'Regex "{package_regex}" failed to extract package name')
+        return
 
     # Check if a document with this hash already exists, and if so don't upload it.
     res = requests.get(
