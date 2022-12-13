@@ -18,6 +18,8 @@ jobs:
             image-version: 0.0.1
           - docker-image: upload-gitlab-failure-logs
             image-version: 0.0.1
+          - docker-image: oom-tracker
+            image-version: 0.0.1
     steps:
       - name: Checkout
         uses: actions/checkout@v3
