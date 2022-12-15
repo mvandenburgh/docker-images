@@ -85,6 +85,12 @@ def main():
         job_error_class = "other"
 
     job_input_data["error_taxonomy"] = job_error_class
+    job_input_data[
+        "gitlab_job_url"
+    ] = f"https://gitlab.spack.io/spack/spack/-/jobs/{job_id}"
+    job_input_data[
+        "gitlab_job_trace_url"
+    ] = f"https://gitlab.spack.io/api/v4/projects/2/jobs/{job_id}/trace"
 
     # Upload to OpenSearch
     doc = JobPayload(**job_input_data)
