@@ -25,7 +25,6 @@ class JobPayload(Document):
         return super().save(**kwargs)
 
 
-GITLAB_URL = os.environ["GITLAB_URL"]
 GITLAB_TOKEN = os.environ["GITLAB_TOKEN"]
 OPENSEARCH_ENDPOINT = os.environ["OPENSEARCH_ENDPOINT"]
 OPENSEARCH_USERNAME = os.environ["OPENSEARCH_USERNAME"]
@@ -47,7 +46,7 @@ def main():
         except ValueError:
             continue
 
-    gl = gitlab.Gitlab(GITLAB_URL, GITLAB_TOKEN)
+    gl = gitlab.Gitlab("https://gitlab.spack.io", GITLAB_TOKEN)
 
     connections.create_connection(
         hosts=[OPENSEARCH_ENDPOINT],
