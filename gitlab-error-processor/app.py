@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import yaml
@@ -11,16 +10,6 @@ config.load_incluster_config()
 batch = client.BatchV1Api()
 
 app = FastAPI()
-
-for env_var in (
-    "GITLAB_TOKEN",
-    "GITLAB_URL",
-    "OPENSEARCH_USERNAME",
-    "OPENSEARCH_PASSWORD",
-    "OPENSEARCH_ENDPOINT",
-):
-    if env_var not in os.environ:
-        raise RuntimeError(f'Environment variable "{env_var}" must be set.')
 
 
 @app.post("/")
