@@ -17,7 +17,7 @@ jobs:
           - docker-image: gitlab-error-processor
             image-version: 0.0.1
           - docker-image: upload-gitlab-failure-logs
-            image-version: 0.0.1
+            image-version: 0.0.2
           - docker-image: oom-tracker
             image-version: 0.0.1
           - docker-image: migrate-opensearch
