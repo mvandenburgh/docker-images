@@ -351,7 +351,10 @@ class SpackCIBridge(object):
         """Perform `git fetch` for a given list of refspecs."""
         print("Fetching GitHub refs for open PRs")
         fetch_args = ["git", "fetch", "-q", "--unshallow", "github"] + fetch_refspecs
-        subprocess.run(fetch_args, check=True)
+        try:
+            subprocess.run(fetch_args, check=True)
+        except subprocess.CalledProcessError as exc:
+            print("Status : FAIL", exc.returncode, exc.output)
 
     def build_local_branches(self, protected_branches):
         """Create local branches for a list of protected branches."""
