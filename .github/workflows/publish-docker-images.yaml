@@ -23,7 +23,7 @@ jobs:
           - docker-image: migrate-opensearch
             image-version: 0.0.1
           - docker-image: gh-gl-sync
-            image-version: 0.0.2
+            image-version: 0.0.3
     steps:
       - name: Checkout
         uses: actions/checkout@v3

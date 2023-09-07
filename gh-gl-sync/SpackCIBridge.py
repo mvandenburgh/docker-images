@@ -10,11 +10,18 @@ from github import Github
 import json
 import os
 import re
+import sentry_sdk
 import subprocess
 import sys
 import tempfile
 import urllib.parse
 import urllib.request
+
+if 'SENTRY_DSN' in os.environ:
+    sentry_sdk.init(
+        os.environ['SENTRY_DSN'],
+        traces_sample_rate=0.05,
+    )
 
 
 class SpackCIBridge(object):
