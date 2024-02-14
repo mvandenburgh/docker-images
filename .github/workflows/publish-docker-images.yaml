@@ -43,3 +43,27 @@ jobs:
           file: ./${{ matrix.docker-image }}/Dockerfile
           push: true
           tags: ghcr.io/mvandenburgh/${{ matrix.docker-image }}:${{ matrix.image-version }}
+
+  publish-win:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - docker-image: spack-win
+            image-version: 0.0.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build and push ${{ matrix.docker-image }}
+        uses: mr-smithers-excellent/docker-build-push@v5
+        with:
+          image: ${{ matrix.docker-image }}
+          directory: ./${{ matrix.docker-image }}
+          dockerfile: ./${{ matrix.docker-image }}/Dockerfile
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          platform: windows/amd64
+          tags: ${{ matrix.image-version }}
