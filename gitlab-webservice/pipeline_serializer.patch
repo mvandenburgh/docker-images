@@ -1,0 +1,43 @@
+--- app/serializers/pipeline_serializer.rb	2024-04-05 05:47:09.582996116 +0100
++++ "app/serializers/pipeline_serializer copy.rb"	2024-04-05 05:47:03.627000641 +0100
+@@ -10,10 +10,40 @@
+     resource = paginator.paginate(resource) if paginated?
+     resource = Gitlab::Ci::Pipeline::Preloader.preload!(resource) if opts.delete(:preload)
+
+-    super(resource, opts)
++    pipelines_warnings = preload_pipelines_warnings(resource)
++    super(resource, opts.merge(pipelines_warnings: pipelines_warnings))
+   end
+   # rubocop: enable CodeReuse/ActiveRecord
+
++  def preload_pipelines_warnings(pipelines)
++    pipelines_ids = pipelines.pluck(:id)
++    pipelines_warnings = {}
++
++    ::CommitStatus.where(commit_id: pipelines_ids)
++                  .latest
++                  .failed_but_allowed
++                  .group(:commit_id)
++                  .count
++                  .each { |id, amount| pipelines_warnings[id] = amount }
++
++    pipelines_warnings
++  end
++
++  def represent_job(job)
++    job_representation = serialize(job)
++
++    # Retrieve pipeline_warnings from context
++    pipeline_id = job.pipeline_id
++    pipeline_warnings = @context[:pipelines_warnings][pipeline_id]
++
++    # If the pipeline has warnings, set has_warnings to true for each job
++    job_representation[:has_warnings] = if pipeline_warnings && pipeline_warnings > 0
++                                          true
++                                        else
++                                          false
++                                        end
++  end
++
+   def represent_status(resource)
+     return {} unless resource.present?
