@@ -1,7 +1,3 @@
 FROM registry.gitlab.com/gitlab-org/build/cng/gitlab-webservice-ee:v16.9.2
 
-RUN ss='s/return false unless Feature.enabled?(:ci_yaml_limit_size.*' \
-  ; ss="$ss/return false/g" \
- && sed -i \
-        -e 's/MAX_YAML_SIZE = 1\.megabyte\+/MAX_YAML_SIZE = 1024\.megabyte/g' \
-        -e "$ss" /srv/gitlab/lib/gitlab/config/loader/yaml.rb
+RUN sed -i 's/subject.success? \&\& subject.has_warnings?/subject.success? # \&\& subject.has_warnings?/' /srv/gitlab/lib/gitlab/ci/status/success_warning.rb
