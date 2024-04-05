@@ -45,6 +45,8 @@ jobs:
           file: ./${{ matrix.docker-image }}/Dockerfile
           push: true
           tags: ghcr.io/mvandenburgh/${{ matrix.docker-image }}:${{ matrix.image-version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   publish-win:
     runs-on: windows-latest
