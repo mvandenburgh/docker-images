@@ -26,6 +26,8 @@ jobs:
             image-version: 0.0.23
           - docker-image: gitlab-webservice
             image-version: 0.0.4
+          - docker-image: gitlab-sidekiq
+            image-version: 0.0.4
           - docker-image: metabase-backup
             image-version: 0.0.1
     steps:
