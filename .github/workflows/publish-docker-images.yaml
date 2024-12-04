@@ -30,6 +30,8 @@ jobs:
             image-version: 0.0.4
           - docker-image: metabase-backup
             image-version: 0.0.1
+          - docker-image: pipeline-webhook-handler
+            image-version: 0.0.1
     steps:
       - name: Checkout
         uses: actions/checkout@v3
