@@ -44,6 +44,8 @@ def receive_webhook():
     if payload.get("object_attributes", {}).get("status") != "failed":
         return jsonify({"error": "Pipeline status is not failed"}), 400
 
+    payload["@timestamp"] = datetime.now().isoformat()
+
     # Store the payload in OpenSearch
     response = opensearch_client.index(
         index="-".join([index_name, datetime.now().strftime("%Y%m%d")]), body=payload
