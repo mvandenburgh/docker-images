@@ -1,34 +1,28 @@
 #!/usr/bin/env python3
-"""
-Fetch keep hashes from GitLab CI pipelines for pruning Spack buildcaches.
-"""
 
 import argparse
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gitlab
 from gitlab.v4.objects import Project, ProjectPipeline
 import sys
 
-try:
-    import sentry_sdk
+import sentry_sdk
 
-    sentry_sdk.init(
-        traces_sample_rate=1.0,
-    )
-except Exception:
-    print(
-        "Could not configure sentry.",
-    )
-
+sentry_sdk.init(
+    traces_sample_rate=1.0,
+)
 
 def fetch_job_hashes(project: Project, job_id: int, job_name: str) -> list[str]:
     """Fetch hashes from a generate job's spack.lock artifact."""
     try:
         job = project.jobs.get(job_id, lazy=True)
         stack_name = job_name.replace("-generate", "")
+        print(f"  Fetching spack.lock for {job_id}/{job_name}")
         artifact_path = f"jobs_scratch_dir/{stack_name}/concrete_environment/spack.lock"
+        print(f"  Fetching artifact {artifact_path}")
         artifact = job.artifact(artifact_path)
         lock = json.loads(artifact)
         hashes = list(lock["concrete_specs"].keys())
@@ -45,7 +39,7 @@ def process_pipeline(
 ) -> set[str]:
     """Process all generate jobs in a pipeline in parallel."""
     print(
-        f"Processing pipeline {pipeline.id}...",
+        f"\nProcessing pipeline {pipeline.id}...",
     )
 
     # Collect all generate jobs
@@ -107,7 +101,7 @@ def main() -> int:
     parser.add_argument(
         "--max-workers",
         type=int,
-        default=10,
+        default=os.cpu_count(),
         help="Maximum number of parallel workers for fetching artifacts",
     )
 
