@@ -2,55 +2,67 @@
 """
 Fetch keep hashes from GitLab CI pipelines for pruning Spack buildcaches.
 """
+
 import argparse
 import json
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gitlab
+from gitlab.v4.objects import Project, ProjectPipeline
 import sys
 
 try:
     import sentry_sdk
+
     sentry_sdk.init(
         traces_sample_rate=1.0,
     )
 except Exception:
-    print("Could not configure sentry.", file=sys.stderr)
+    print(
+        "Could not configure sentry.",
+    )
 
 
-def fetch_job_hashes(project, job_id, job_name: str):
+def fetch_job_hashes(project: Project, job_id: int, job_name: str) -> list[str]:
     """Fetch hashes from a generate job's spack.lock artifact."""
     try:
         job = project.jobs.get(job_id, lazy=True)
         stack_name = job_name.replace("-generate", "")
         artifact_path = f"jobs_scratch_dir/{stack_name}/concrete_environment/spack.lock"
-        print(f"  Fetching artifact {artifact_path} from job {job_id}/{job_name}...", file=sys.stderr)
         artifact = job.artifact(artifact_path)
         lock = json.loads(artifact)
         hashes = list(lock["concrete_specs"].keys())
-        print(f"  Found {len(hashes)} hashes in job {job_id}/{job_name}", file=sys.stderr)
         return hashes
     except (gitlab.exceptions.GitlabHttpError, gitlab.exceptions.GitlabGetError) as e:
-        print(f"  Failed to fetch spack.lock for {job_id}/{job_name}: {e}", file=sys.stderr)
+        print(
+            f"  Failed to fetch spack.lock for {job_id}/{job_name}: {e}",
+        )
         return []
 
 
-def process_pipeline(project, pipeline, max_workers=10):
+def process_pipeline(
+    project: Project, pipeline: ProjectPipeline, max_workers: int = 10
+) -> set[str]:
     """Process all generate jobs in a pipeline in parallel."""
-    print(f"Processing pipeline {pipeline.id}...", file=sys.stderr)
+    print(
+        f"Processing pipeline {pipeline.id}...",
+    )
 
     # Collect all generate jobs
-    generate_jobs = []
+    generate_jobs: list[tuple[int, str]] = []
     for job in pipeline.jobs.list(iterator=True, scope="success"):
-        if job.stage == 'generate':
+        if job.stage == "generate":
             generate_jobs.append((job.id, job.name))
 
     # Fetch artifacts in parallel
-    all_hashes = set()
+    all_hashes: set[str] = set()
     if generate_jobs:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_job = {
-                executor.submit(fetch_job_hashes, project, job_id, job_name): (job_id, job_name)
+                executor.submit(fetch_job_hashes, project, job_id, job_name): (
+                    job_id,
+                    job_name,
+                )
                 for job_id, job_name in generate_jobs
             }
 
@@ -61,7 +73,7 @@ def process_pipeline(project, pipeline, max_workers=10):
     return all_hashes
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fetch keep hashes from GitLab pipelines"
     )
@@ -87,7 +99,8 @@ def main():
         help="Number of days to look back for pipelines",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         required=True,
         help="Output file for keep list",
     )
@@ -101,31 +114,38 @@ def main():
     args = parser.parse_args()
 
     # Connect to GitLab
-    print(f"Connecting to {args.gitlab_url}...", file=sys.stderr)
+    print(
+        f"Connecting to {args.gitlab_url}...",
+    )
     gl = gitlab.Gitlab(args.gitlab_url)
-    project = gl.projects.get(args.project)
+    project: Project = gl.projects.get(args.project)
 
     # Calculate date range
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=args.since_days)
 
-    print(f"Fetching pipelines from {args.ref} between {since.isoformat()} and {now.isoformat()}...", file=sys.stderr)
+    print(
+        f"Fetching pipelines from {args.ref} between {since.isoformat()} and {now.isoformat()}...",
+    )
 
     # Collect all pipelines first
-    pipelines = list(project.pipelines.list(
-        iterator=True,
-        updated_before=now,
-        updated_after=since,
-        ref=args.ref
-    ))
+    pipelines = list(
+        project.pipelines.list(
+            iterator=True, updated_before=now, updated_after=since, ref=args.ref
+        )
+    )
 
-    print(f"Found {len(pipelines)} pipelines to process", file=sys.stderr)
+    print(
+        f"Found {len(pipelines)} pipelines to process",
+    )
 
     # Process pipelines in parallel
-    all_hashes = set()
+    all_hashes: set[str] = set()
     with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
         future_to_pipeline = {
-            executor.submit(process_pipeline, project, pipeline, args.max_workers): pipeline.id
+            executor.submit(
+                process_pipeline, project, pipeline, args.max_workers
+            ): pipeline.id
             for pipeline in pipelines
         }
 
@@ -133,15 +153,21 @@ def main():
             hashes = future.result()
             all_hashes.update(hashes)
 
-    print(f"\nProcessed {len(pipelines)} pipelines", file=sys.stderr)
-    print(f"Total unique hashes to keep: {len(all_hashes)}", file=sys.stderr)
+    print(
+        f"\nProcessed {len(pipelines)} pipelines",
+    )
+    print(
+        f"Total unique hashes to keep: {len(all_hashes)}",
+    )
 
     # Write keeplist file (one hash per line)
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         for hash_val in sorted(all_hashes):
             f.write(f"{hash_val}\n")
 
-    print(f"Keep list written to {args.output}", file=sys.stderr)
+    print(
+        f"Keep list written to {args.output}",
+    )
     return 0
 
 
