@@ -39,17 +39,17 @@ echo "Keep list created with $(wc -l < ${keeplist_file}) hashes"
 
 # Add the mirror
 echo "Adding mirror..."
-spack mirror add develop-mirror "${BUILDCACHE_URL}"
+spack mirror add mirror-to-prune "${BUILDCACHE_URL}"
 echo "Adding mirror...done"
 
 # Run the new builtin prune command with keeplist
 echo "Running buildcache prune with keeplist..."
-spack buildcache prune --keeplist "${keeplist_file}" develop-mirror --dry-run
+spack buildcache prune --keeplist "${keeplist_file}" mirror-to-prune
 echo "Running buildcache prune...done"
 
 # Update the mirror index
 echo "Updating mirror index..."
-spack buildcache update-index develop-mirror
+spack buildcache update-index mirror-to-prune
 echo "Updating mirror index...done"
 
 echo ""
