@@ -14,12 +14,6 @@ echo "Configuring spack shell...done"
 export SPACK_DISABLE_LOCAL_CONFIG=1
 
 # Environment variables from cronjob
-GITLAB_URL=${GITLAB_URL:-https://gitlab.spack.io}
-GITLAB_PROJECT=${GITLAB_PROJECT:-spack/spack}
-BUILDCACHE_URL=${BUILDCACHE_URL:-s3://spack-binaries/develop}
-PRUNE_REF=${PRUNE_REF:-develop}
-PRUNE_SINCE_DAYS=${PRUNE_SINCE_DAYS:-14}
-
 echo "Configuration:"
 echo "  GITLAB_URL: ${GITLAB_URL}"
 echo "  GITLAB_PROJECT: ${GITLAB_PROJECT}"
@@ -54,9 +48,9 @@ spack buildcache prune --keeplist "${keeplist_file}" develop-mirror --dry-run
 echo "Running buildcache prune...done"
 
 # Update the mirror index
-echo "Updating mirror index..."
-spack buildcache update-index develop-mirror
-echo "Updating mirror index...done"
+# echo "Updating mirror index..."
+# spack buildcache update-index develop-mirror
+# echo "Updating mirror index...done"
 
 echo ""
 echo "Pruning complete"
