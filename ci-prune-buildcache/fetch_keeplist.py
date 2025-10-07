@@ -79,7 +79,7 @@ def main() -> int:
     parser.add_argument(
         "--project",
         required=True,
-        help="GitLab project path (e.g., spack/spack)",
+        help="GitLab project path (e.g., spack/spack-packages)",
     )
     parser.add_argument(
         "--ref",
