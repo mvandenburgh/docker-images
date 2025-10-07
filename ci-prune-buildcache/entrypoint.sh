@@ -48,9 +48,9 @@ spack buildcache prune --keeplist "${keeplist_file}" develop-mirror --dry-run
 echo "Running buildcache prune...done"
 
 # Update the mirror index
-# echo "Updating mirror index..."
-# spack buildcache update-index develop-mirror
-# echo "Updating mirror index...done"
+echo "Updating mirror index..."
+spack buildcache update-index develop-mirror
+echo "Updating mirror index...done"
 
 echo ""
 echo "Pruning complete"
