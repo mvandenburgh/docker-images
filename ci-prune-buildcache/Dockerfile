@@ -12,13 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# TODO: switch to `develop` branch once PR is merged
-RUN git clone --depth 1 --branch direct-pruning https://github.com/mvandenburgh/spack.git /opt/spack
-
-# Install scripts
 COPY entrypoint.sh ./
 COPY fetch_keeplist.py ./
+COPY prune.py ./
 
-WORKDIR /work/
+WORKDIR /app/
 
 ENTRYPOINT [ "bash", "/app/entrypoint.sh"]

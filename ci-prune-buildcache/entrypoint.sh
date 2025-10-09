@@ -5,6 +5,11 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 echo "Input: $@"
 
+# Clone spack
+echo "Cloning spack..."
+git clone --depth 1 --branch direct-pruning https://github.com/mvandenburgh/spack.git
+echo "Cloning spack...done"
+
 # Configure spack
 echo "Configuring spack shell..."
 . /opt/spack/share/spack/setup-env.sh
@@ -42,9 +47,9 @@ echo "Adding mirror..."
 spack mirror add mirror-to-prune "${BUILDCACHE_URL}"
 echo "Adding mirror...done"
 
-# Run the new builtin prune command with keeplist
+# Run pruning with keeplist
 echo "Running buildcache prune with keeplist..."
-spack buildcache prune --keeplist "${keeplist_file}" mirror-to-prune
+spack python prune.py --mirror mirror-to-prune --keeplist "${keeplist_file}"
 echo "Running buildcache prune...done"
 
 # Update the mirror index
